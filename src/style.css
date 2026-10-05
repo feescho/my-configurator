@@ -1,0 +1,162 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap');
+
+:root {
+  color: #11111a;
+  background: #f1eaf4;
+  font-family: Manrope, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+button,
+canvas {
+  font: inherit;
+}
+
+.prototype {
+  min-height: 100svh;
+  overflow: hidden;
+  position: relative;
+}
+
+.prototype::before {
+  border: 1px solid rgba(120, 69, 232, 0.12);
+  border-radius: 50%;
+  content: '';
+  height: 72vw;
+  left: 46%;
+  max-height: 900px;
+  max-width: 900px;
+  pointer-events: none;
+  position: absolute;
+  top: 8%;
+  transform: translateX(-50%);
+  width: 72vw;
+}
+
+.masthead {
+  left: clamp(24px, 6vw, 92px);
+  max-width: 280px;
+  position: absolute;
+  top: clamp(28px, 7vh, 72px);
+  z-index: 2;
+}
+
+.eyebrow,
+.viewer-label,
+.edition {
+  color: #6e6479;
+  font: 500 10px/1.4 'DM Mono', monospace;
+  letter-spacing: 0.12em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.eyebrow::before {
+  background: #d943b8;
+  content: '';
+  display: inline-block;
+  height: 1px;
+  margin: 0 9px 3px 0;
+  width: 18px;
+}
+
+h1 {
+  color: #11111a;
+  font-size: clamp(38px, 5.2vw, 76px);
+  font-weight: 700;
+  letter-spacing: -0.06em;
+  line-height: 0.92;
+  margin: 18px 0 20px;
+}
+
+h1 em {
+  color: #7845e8;
+  font-style: normal;
+}
+
+.intro {
+  color: #766a80;
+  font-size: 13px;
+  line-height: 1.65;
+  margin: 0;
+  max-width: 210px;
+}
+
+.viewer {
+  height: 100svh;
+  min-height: 560px;
+  position: relative;
+}
+
+#dog-canvas {
+  cursor: grab;
+  display: block;
+  height: 100%;
+  outline: none;
+  touch-action: none;
+  width: 100%;
+}
+
+#dog-canvas:active {
+  cursor: grabbing;
+}
+
+.viewer-label {
+  bottom: 38px;
+  left: 50%;
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.viewer-label span {
+  color: #d943b8;
+  padding: 0 9px;
+}
+
+.edition {
+  bottom: 38px;
+  position: absolute;
+  right: clamp(24px, 6vw, 92px);
+}
+
+@media (max-width: 700px) {
+  .masthead {
+    max-width: 210px;
+    top: 28px;
+  }
+
+  h1 {
+    font-size: clamp(38px, 12vw, 58px);
+    margin: 14px 0 14px;
+  }
+
+  .intro {
+    font-size: 12px;
+  }
+
+  .viewer {
+    min-height: 600px;
+  }
+
+  .viewer-label {
+    bottom: 28px;
+    font-size: 9px;
+  }
+
+  .edition {
+    bottom: 28px;
+    display: none;
+  }
+}
