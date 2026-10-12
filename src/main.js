@@ -311,9 +311,9 @@ const bodyProfiles = {
 }
 
 const earProfiles = {
-  classic: { radius: 0.54, tube: 0.21, scale: [0.82, 1.22, 1], offsetY: 0 },
-  tall: { radius: 0.56, tube: 0.2, scale: [0.76, 1.4, 1], offsetY: -0.12 },
-  small: { radius: 0.4, tube: 0.19, scale: [0.82, 0.93, 1], offsetY: -0.05 },
+  classic: { radius: 0.43, tube: 0.28, scale: [0.64, 1.12, 1] },
+  tall: { radius: 0.45, tube: 0.28, scale: [0.62, 1.32, 1] },
+  small: { radius: 0.35, tube: 0.25, scale: [0.68, 0.94, 1] },
 }
 
 const dog = new THREE.Group()
@@ -380,35 +380,40 @@ function createDogAnchors(spec) {
   const headScale = spec.headScale
   const tailLift = spec.tailLift
   const point = (x, y, z = 0) => new THREE.Vector3(x, y, z)
-  const torsoStart = point(-1.38 * body, 1.95)
-  const torsoEnd = point(1.52 * body, 1.95)
-  const neckRoot = torsoStart.clone().add(point(0.21 * body, 0.22))
-  const neckTop = neckRoot.clone().add(point(-0.08 * body, 1.18 * neckHeight))
-  const headCenter = neckTop.clone().add(point(-0.58 * headScale, 0.1 * headScale))
-  const muzzleStart = headCenter.clone().add(point(-0.29 * headScale, -0.03 * headScale))
-  const muzzleEnd = muzzleStart.clone().add(point(-0.76 * headScale, -0.05 * headScale))
-  const earCenter = headCenter.clone().add(point(0.43 * body, 0.24 * neckHeight))
-  const earRoot = headCenter.clone().add(point(0.4 * body, 0))
-  const legRootY = torsoStart.y - 0.4
-  const legEndY = -0.11 * legLength
-  const frontLegRoot = point(-0.78 * body, legRootY)
-  const rearLegRoot = point(1.18 * body, legRootY)
-  const tailRoot = torsoEnd.clone().add(point(0.16 * body, 0.18))
-  const tailBend = tailRoot.clone().add(point(0.49 * body, 0.48 * tailLift))
-  const tailTip = tailBend.clone().add(point(-0.17 * body, 0.57 * tailLift))
+  const torsoStart = point(-1.05 * body, 1.76 * legLength)
+  const torsoEnd = point(1.15 * body, torsoStart.y)
+  const neckRoot = torsoStart.clone().add(point(0.04, 0.02))
+  const neckTop = neckRoot.clone().add(point(-0.34, 1.34 * neckHeight))
+  const muzzleStart = neckTop.clone().add(point(0.1 * headScale, 0.08))
+  const muzzleEnd = muzzleStart.clone().add(point(-1.28 * headScale, 0.06))
+  const earRoot = neckTop.clone().add(point(0.08, 0.19))
+  const frontLegRoot = torsoStart.clone().add(point(0.1, -0.02))
+  const rearLegRoot = torsoEnd.clone().add(point(-0.1, -0.02))
+  const tailRoot = torsoEnd.clone().add(point(-0.04, 0.09))
+  const tailTip = tailRoot.clone().add(point(0.43, 1.12 * tailLift))
 
   return {
     torso: { start: torsoStart, end: torsoEnd },
     neck: { root: neckRoot, top: neckTop },
-    head: { center: headCenter, muzzleStart, muzzleEnd, earCenter, earRoot },
+    head: { muzzleStart, muzzleEnd, earRoot },
     legs: {
-      frontNear: { root: frontLegRoot.clone().setZ(0.42), end: point(frontLegRoot.x - 0.16, legEndY, 0.42) },
-      frontFar: { root: frontLegRoot.clone().setZ(-0.42), end: point(frontLegRoot.x - 0.16, legEndY, -0.42) },
-      rearNear: { root: rearLegRoot.clone().setZ(0.42), end: point(rearLegRoot.x + 0.18, legEndY, 0.42) },
-      rearFar: { root: rearLegRoot.clone().setZ(-0.42), end: point(rearLegRoot.x + 0.18, legEndY, -0.42) },
+      frontNear: { root: frontLegRoot.clone().setZ(0.27), end: point(frontLegRoot.x - 0.4, -0.09, 0.48) },
+      frontFar: { root: frontLegRoot.clone().setZ(-0.27), end: point(frontLegRoot.x - 0.4, -0.09, -0.48) },
+      rearNear: { root: rearLegRoot.clone().setZ(0.27), end: point(rearLegRoot.x + 0.34, -0.09, 0.48) },
+      rearFar: { root: rearLegRoot.clone().setZ(-0.27), end: point(rearLegRoot.x + 0.34, -0.09, -0.48) },
     },
-    tail: { root: tailRoot, bend: tailBend, tip: tailTip },
+    tail: { root: tailRoot, tip: tailTip },
   }
+}
+
+// Dog-only inflated bubbles: Three.js supplies the closed topology and normals.
+// Ellipsoidal shoulders narrow into overlapping ends instead of straight tube walls.
+function addDogBubble(group, start, end, radius, material, name, depth = 1) {
+  const direction = end.clone().sub(start)
+  const bubble = addBulb(group, start.clone().add(end).multiplyScalar(0.5),
+    [radius, direction.length() / 2 + 0.1, radius * depth], material, name)
+  bubble.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize())
+  return bubble
 }
 
 function buildBalloonDog(spec) {
@@ -423,17 +428,19 @@ function buildBalloonDog(spec) {
   const twists = createPartGroup('twist joints')
   const earProfile = earProfiles[spec.earStyle] || earProfiles.classic
 
-  addCapsule(torso, anchors.torso.start, anchors.torso.end, 0.58, zoneMaterial('dog', 'body', balloonMaterials.magenta), 'magenta torso')
-  addCapsule(torso, anchors.neck.root, anchors.neck.top, 0.43, zoneMaterial('dog', 'body', balloonMaterials.amber), 'amber neck')
-  addBulb(head, anchors.head.center, [0.57 * spec.headScale, 0.49 * spec.headScale, 0.51 * spec.headScale], zoneMaterial('dog', 'head', balloonMaterials.pearl), 'pearl head')
-  addCapsule(head, anchors.head.muzzleStart, anchors.head.muzzleEnd, 0.31 * spec.headScale, zoneMaterial('dog', 'head', balloonMaterials.pearl), 'pearl muzzle')
+  addDogBubble(torso, anchors.torso.start, anchors.torso.end, 0.55, zoneMaterial('dog', 'body', balloonMaterials.magenta), 'magenta torso')
+  addDogBubble(torso, anchors.neck.root, anchors.neck.top, 0.4, zoneMaterial('dog', 'body', balloonMaterials.amber), 'amber neck')
+  addDogBubble(head, anchors.head.muzzleStart, anchors.head.muzzleEnd, 0.41 * spec.headScale, zoneMaterial('dog', 'head', balloonMaterials.pearl), 'pearl muzzle', 1.06)
+  addBulb(head, anchors.head.muzzleEnd.clone().add(new THREE.Vector3(-0.1, 0, 0)), [0.12, 0.105, 0.105], zoneMaterial('dog', 'head', balloonMaterials.pearl), 'muzzle tied tip')
 
   ;[1, -1].forEach((side) => {
     const material = zoneMaterial('dog', 'ears', balloonMaterials[side > 0 ? 'magenta' : 'violet'])
     const ear = addMesh(ears, new THREE.TorusGeometry(earProfile.radius, earProfile.tube, 24, 64), material, `${side > 0 ? 'near' : 'far'} sculptural loop ear`)
-    ear.position.copy(anchors.head.earCenter).add(new THREE.Vector3(0, earProfile.offsetY, side * 0.38))
     ear.scale.set(...earProfile.scale)
-    ear.rotation.set(0.12, side * 0.32, side * -0.18)
+    ear.rotation.set(side * 0.1, side * 0.16, -0.15)
+    // Place the bottom of every preset at the same attachment, even when tilted.
+    const lowerEnd = new THREE.Vector3(0, -(earProfile.radius + earProfile.tube) * earProfile.scale[1], 0).applyEuler(ear.rotation)
+    ear.position.copy(anchors.head.earRoot).add(new THREE.Vector3(0, -0.18, side * 0.28)).sub(lowerEnd)
   })
 
   const legParts = [
@@ -443,38 +450,26 @@ function buildBalloonDog(spec) {
     { anchor: anchors.legs.rearFar, material: zoneMaterial('dog', 'rear-legs', balloonMaterials.magenta), name: 'rear far' },
   ]
   legParts.forEach(({ anchor, material, name }) => {
-    addCapsule(legs, anchor.root, anchor.end, 0.39, material, `${name} rounded leg`)
+    addDogBubble(legs, anchor.root, anchor.end, 0.43, material, `${name} inflated leg`, 0.94)
+    addBulb(twists, anchor.root, [0.22, 0.17, 0.2], material, `${name} compressed twist`)
   })
 
+  const tailMaterial = zoneMaterial('dog', 'tail', balloonMaterials.cyan)
   if (spec.tailStyle === 'upright') {
-    addCapsule(tail, anchors.tail.root, anchors.tail.bend, 0.23, zoneMaterial('dog', 'tail', balloonMaterials.cyan), 'tail rise')
-    addCapsule(tail, anchors.tail.bend.clone().add(new THREE.Vector3(-0.18 * spec.bodyLength, -0.15 * spec.tailLift, 0)), anchors.tail.tip, 0.19, zoneMaterial('dog', 'tail', balloonMaterials.violet), 'tail tip')
+    addDogBubble(tail, anchors.tail.root, anchors.tail.tip, 0.3, tailMaterial, 'inflated upright tail')
+    const tipEnd = anchors.tail.tip.clone().add(new THREE.Vector3(0.1, 0.26, 0))
+    addDogBubble(tail, anchors.tail.tip, tipEnd, 0.09, zoneMaterial('dog', 'tail', balloonMaterials.violet), 'slender tail tip')
   } else {
-    const tailPaths = {
-      short: [
-        anchors.tail.root,
-        anchors.tail.root.clone().add(new THREE.Vector3(0.2 * spec.bodyLength, 0.18 * spec.tailLift, 0)),
-        anchors.tail.root.clone().add(new THREE.Vector3(0.43 * spec.bodyLength, 0.12 * spec.tailLift, 0)),
-        anchors.tail.root.clone().add(new THREE.Vector3(0.3 * spec.bodyLength, 0.47 * spec.tailLift, 0)),
-      ],
-      long: [
-        anchors.tail.root,
-        anchors.tail.root.clone().add(new THREE.Vector3(0.32 * spec.bodyLength, 0.22 * spec.tailLift, 0)),
-        anchors.tail.root.clone().add(new THREE.Vector3(0.67 * spec.bodyLength, 0.68 * spec.tailLift, 0)),
-        anchors.tail.root.clone().add(new THREE.Vector3(0.82 * spec.bodyLength, 1.2 * spec.tailLift, 0)),
-        anchors.tail.root.clone().add(new THREE.Vector3(0.58 * spec.bodyLength, 1.55 * spec.tailLift, 0)),
-      ],
-    }
-    const path = tailPaths[spec.tailStyle] || tailPaths.short
-    const segments = spec.tailStyle === 'short'
-      ? [[path[0], path[2]], [path[1], path[3]]]
-      : [[path[0], path[2]], [path[1], path[3]], [path[2], path[4]]]
-    segments.forEach(([start, end], index) => {
-      addCapsule(tail, start, end, 0.22, zoneMaterial('dog', 'tail', balloonMaterials.cyan), `tail ${index + 1}`)
-    })
+    const length = spec.tailStyle === 'long' ? 1.25 : 0.62
+    // One closed torus gives a folded curl; bury its lower arc in the rump.
+    const curl = addMesh(tail, new THREE.TorusGeometry(length * 0.45, 0.19, 24, 64), tailMaterial, 'folded tail curl')
+    curl.scale.set(0.8, spec.tailLift, 1)
+    curl.position.copy(anchors.tail.root).add(new THREE.Vector3(0.08, length * 0.32, 0))
+    curl.rotation.z = -0.22
   }
-  addBulb(twists, anchors.neck.root.clone().add(new THREE.Vector3(-0.03 * spec.bodyLength, 0.13, 0)), [0.2, 0.13, 0.18], zoneMaterial('dog', 'body', balloonMaterials.amber), 'neck body twist')
-  addBulb(twists, anchors.head.muzzleStart.clone().add(new THREE.Vector3(-0.03 * spec.headScale, 0, 0)), [0.14, 0.1, 0.14], zoneMaterial('dog', 'head', balloonMaterials.pearl), 'muzzle twist')
+  addBulb(twists, anchors.neck.root, [0.24, 0.18, 0.24], zoneMaterial('dog', 'body', balloonMaterials.amber), 'neck body twist')
+  addBulb(twists, anchors.neck.top, [0.25, 0.18, 0.27], zoneMaterial('dog', 'head', balloonMaterials.pearl), 'head twist')
+  addBulb(twists, anchors.tail.root, [0.22, 0.19, 0.22], tailMaterial, 'tail root twist')
 }
 
 function createRabbitAnchors(spec) {
