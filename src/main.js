@@ -2,112 +2,179 @@ import './style.css'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
+import { createFlowerInterior } from './flowers.js'
 
 const themeStorageKey = 'balloon-animal-studio-theme'
 const initialTheme = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'
 document.body.classList.toggle('theme-dark', initialTheme === 'dark')
 
+// Segment illustrations follow the current models: loop-eared standing dog,
+// and seated rabbit with long inflated ears, compact forelegs and round tail.
+function animalThumbnail(animal) {
+  const dog = `<ellipse cx="42" cy="66" rx="7" ry="17"/><ellipse cx="77" cy="66" rx="7" ry="17"/>
+    <ellipse cx="86" cy="43" rx="5" ry="18" transform="rotate(28 86 43)"/>
+    <ellipse cx="58" cy="49" rx="24" ry="10"/>
+    <ellipse cx="34" cy="40" rx="8" ry="17" transform="rotate(-25 34 40)"/>
+    <ellipse cx="25" cy="29" rx="16" ry="8"/>
+    <ellipse cx="37" cy="16" rx="8" ry="14"/><ellipse cx="37" cy="16" rx="2" ry="8"/>
+    <ellipse cx="28" cy="15" rx="8" ry="14"/><ellipse cx="28" cy="15" rx="2" ry="8"/>
+    <ellipse cx="33" cy="67" rx="8" ry="18" transform="rotate(12 33 67)"/>
+    <ellipse cx="70" cy="67" rx="8" ry="18" transform="rotate(-12 70 67)"/>`;
+  const rabbit = `<circle cx="76" cy="65" r="8"/>
+    <ellipse cx="55" cy="61" rx="22" ry="23"/>
+    <ellipse cx="43" cy="39" rx="16" ry="15"/><ellipse cx="29" cy="43" rx="11" ry="7"/>
+    <ellipse cx="39" cy="19" rx="6" ry="18" transform="rotate(-10 39 19)"/>
+    <ellipse cx="53" cy="19" rx="6" ry="18" transform="rotate(12 53 19)"/>
+    <ellipse cx="43" cy="74" rx="6" ry="11"/><ellipse cx="32" cy="74" rx="6" ry="11"/>
+    <ellipse cx="62" cy="74" rx="10" ry="15" transform="rotate(30 62 74)"/>`;
+  return `<svg class="animal-thumbnail" viewBox="0 0 104 94" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">${animal === 'dog' ? dog : rabbit}</g></svg>`
+}
+
+// Form previews mirror the loop sizes, body lengths and closed tail shapes.
+function formIcon(group, value) {
+  let shapes
+  if (group === 'ears') {
+    const height = { classic: 17, tall: 21, small: 13 }[value]
+    shapes = [25, 40].map(x => `<ellipse cx="${x}" cy="${47 - height}" rx="8" ry="${height}"/><ellipse cx="${x}" cy="${47 - height}" rx="3" ry="${height - 5}"/>`).join('')
+  } else if (group === 'body') {
+    const length = { classic: 21, compact: 15, long: 28 }[value]
+    shapes = `<ellipse cx="32" cy="25" rx="${length}" ry="9"/>` + [-1, 1].map(side => `<ellipse cx="${32 + side * (length - 5)}" cy="40" rx="5" ry="12" transform="rotate(${side * -10} ${32 + side * (length - 5)} 40)"/>`).join('')
+  } else {
+    shapes = value === 'upright'
+      ? '<ellipse cx="34" cy="27" rx="6" ry="18" transform="rotate(22 34 27)"/><ellipse cx="42" cy="9" rx="2" ry="5" transform="rotate(22 42 9)"/>'
+      : value === 'balloon-tip'
+        ? '<path d="M25 46L35 19M29 47L39 20"/><ellipse cx="39" cy="12" rx="7" ry="9"/>'
+        : '<path d="M25 46C23 32 42 33 39 20M29 47C27 35 46 34 43 19"/><ellipse cx="41" cy="12" rx="7" ry="9"/>'
+    shapes += '<ellipse cx="26" cy="49" rx="9" ry="3"/>'
+  }
+  return `<svg class="form-icon" viewBox="0 0 64 56" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${shapes}</svg>`
+}
+
+function rabbitFormIcon(group, value) {
+  let shapes
+  if (group === 'ears') {
+    const height = { classic: 17, long: 21, short: 12 }[value]
+    shapes = [-1, 1].map(side => `<ellipse cx="${32 + side * 8}" cy="${48 - height}" rx="5" ry="${height}" transform="rotate(${side * 9} ${32 + side * 8} 48)"/>`).join('')
+  } else {
+    shapes = value === 'heart'
+      ? '<path d="M32 46C26 40 12 30 12 21C12 8 27 8 32 18C37 8 52 8 52 21C52 30 38 40 32 46ZM32 36C27 31 20 25 20 21C20 16 26 17 28 24Q32 29 36 24C38 17 44 16 44 21C44 25 37 31 32 36Z"/><ellipse cx="32" cy="44" rx="3" ry="2"/>'
+      : value === 'curled'
+      ? '<ellipse cx="32" cy="29" rx="14" ry="16"/><ellipse cx="32" cy="29" rx="6" ry="8"/>'
+      : '<circle cx="32" cy="30" r="12"/>'
+    shapes += '<path d="M22 48q10-5 20 0"/>'
+  }
+  return `<svg class="form-icon" viewBox="0 0 64 56" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${shapes}</svg>`
+}
+
+// Small interface illustrations; independent of the Three.js models.
+function controlIcon(name) {
+  const paths = {
+    dog: 'M5 10H3a2 2 0 0 1 0-4h3V3a1 1 0 0 1 2 0v4l2 5h8l3-5a1 1 0 0 1 2 1l-3 6v6a1 1 0 0 1-2 0v-4h-7v4a1 1 0 0 1-2 0v-6Z',
+    rabbit: 'M8 9 6 3a1.5 1.5 0 0 1 3-1l2 6 1-6a1.5 1.5 0 0 1 3 1l-1 7c4 1 6 4 5 7 4-2 5 3 1 3H8c-3 0-4-2-3-4l1-3c-4 0-4-4 0-4Zm6 7c-3-1-5 2-3 4',
+    jewel: 'm3 8 4-5h10l4 5-9 13Zm0 0h18M7 3l2 5 3 13 3-13 2-5',
+    vinyl: 'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM7 9a6 6 0 0 1 4-3',
+    chrome: 'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM6 18 18 6M5 14l9-9m-3 14 8-8',
+    none: 'M20 12a8 8 0 1 1-16 0 8 8 0 0 1 16 0ZM7 17 17 7',
+    flowers: 'M12 9c-6-9 6-9 0 0 9-6 9 6 0 0 6 9-6 9 0 0-9 6-9-6 0 0Zm0 3v9m0-3c3 0 5-2 5-4-3 0-5 2-5 4',
+  }
+  return `<svg class="control-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[name]}"/></svg>`
+}
+
 document.querySelector('#app').innerHTML = `
   <main class="prototype">
-    <p class="poster-label poster-label--top">BALLOON ANIMAL STUDIO / 001</p>
-    <p class="poster-label poster-label--edition">INTERACTIVE EDITION<br>2026 / BRUSSELS</p>
     <div class="theme-toggle" role="group" aria-label="Colour theme">
       <button class="theme-option ${initialTheme === 'light' ? 'is-active' : ''}" type="button" data-theme="light" aria-pressed="${initialTheme === 'light'}">Light</button>
       <button class="theme-option ${initialTheme === 'dark' ? 'is-active' : ''}" type="button" data-theme="dark" aria-pressed="${initialTheme === 'dark'}">Dark</button>
     </div>
-    <span class="poster-rule poster-rule--top" aria-hidden="true"></span>
     <div class="content-column">
       <header class="masthead">
-        <p class="eyebrow">PLAYFUL FORM / CHROMATIC SERIES</p>
         <h1 data-animal-title>Chromatic<br><em>Balloon Dog</em></h1>
-        <p class="intro">A first study in inflated colour, chrome light, and playful form.</p>
       </header>
+      <div class="config-dock">
       <aside class="config-panel" aria-label="Balloon animal configurator">
-        <div class="control-row">
+          <fieldset class="animal-section config-group">
+            <legend>Animal</legend>
           <div class="animal-switch" role="group" aria-label="Balloon animal">
-            <button class="option is-active" type="button" data-control="animal" data-value="dog" aria-pressed="true">Dog</button>
-            <button class="option" type="button" data-control="animal" data-value="rabbit" aria-pressed="false">Rabbit</button>
+            <button class="option is-active animal-preview" type="button" data-control="animal" data-value="dog" aria-pressed="true" aria-label="Balloon Dog">${animalThumbnail('dog')}<span>Dog</span></button>
+            <button class="option animal-preview" type="button" data-control="animal" data-value="rabbit" aria-pressed="false" aria-label="Balloon Rabbit">${animalThumbnail('rabbit')}<span>Rabbit</span></button>
           </div>
-          <div class="tray-tabs" role="tablist" aria-label="Configurator sections">
-            <button class="tray-tab is-active" type="button" role="tab" id="tray-tab-colour" aria-controls="tray-panel-colour" aria-selected="true" data-tray-tab="colour">Colour</button>
-            <button class="tray-tab" type="button" role="tab" id="tray-tab-surface" aria-controls="tray-panel-surface" aria-selected="false" data-tray-tab="surface">Surface</button>
-            <button class="tray-tab" type="button" role="tab" id="tray-tab-form" aria-controls="tray-panel-form" aria-selected="false" data-tray-tab="form">Form</button>
-          </div>
-        </div>
-        <section class="tray-panel" role="tabpanel" id="tray-panel-colour" aria-labelledby="tray-tab-colour" data-tray-panel="colour">
+          </fieldset>
+        <section class="tray-panel colour-rail" aria-label="Colour and decoration">
           <fieldset class="config-group">
-            <legend>Colour composition</legend>
-            <div class="option-grid option-grid--two" role="group" aria-label="Colour composition">
-              <button class="option is-active" type="button" data-control="colour-composition" data-value="original" aria-pressed="true">Original mix</button>
-              <button class="option" type="button" data-control="colour-composition" data-value="custom" aria-pressed="false">Custom colours</button>
-            </div>
-            <div class="composition-editor" data-composition-editor hidden>
-              <p class="composition-label">Choose a part</p>
-              <div class="option-grid composition-zones" role="group" aria-label="Balloon part">
-                <button class="option is-active" type="button" data-control="colour-zone" data-value="body" aria-pressed="true">Body</button>
-                <button class="option" type="button" data-control="colour-zone" data-value="head" aria-pressed="false">Head</button>
-                <button class="option" type="button" data-control="colour-zone" data-value="ears" aria-pressed="false">Ears</button>
-                <button class="option" type="button" data-control="colour-zone" data-value="front-legs" aria-pressed="false">Front legs</button>
-                <button class="option" type="button" data-control="colour-zone" data-value="rear-legs" aria-pressed="false">Rear legs</button>
-                <button class="option" type="button" data-control="colour-zone" data-value="tail" aria-pressed="false">Tail</button>
+            <legend>Balloon colour</legend>
+              <div class="swatches" role="group" aria-label="Whole animal colour">
+                ${[['pink', 'Hot pink'], ['violet', 'Purple'], ['turquoise', 'Turquoise'], ['yellow', 'Soft yellow']].map(([colour, label]) => `<button class="swatch swatch-${colour}" type="button" data-control="solid-colour" data-value="${colour}" aria-pressed="false" aria-label="${label}"></button>`).join('')}
               </div>
-              <p class="composition-label">Colour for <span data-active-colour-zone>Body</span></p>
-              <div class="swatches" role="group" aria-label="Colour for selected balloon part">
-                <button class="swatch swatch-pink" type="button" data-control="zone-colour" data-value="pink" aria-pressed="true" aria-label="Pink"></button>
-                <button class="swatch swatch-violet" type="button" data-control="zone-colour" data-value="violet" aria-pressed="false" aria-label="Violet"></button>
-                <button class="swatch swatch-cyan" type="button" data-control="zone-colour" data-value="cyan" aria-pressed="false" aria-label="Cyan"></button>
-                <button class="swatch swatch-turquoise" type="button" data-control="zone-colour" data-value="turquoise" aria-pressed="false" aria-label="Turquoise"></button>
-                <button class="swatch swatch-mint" type="button" data-control="zone-colour" data-value="mint" aria-pressed="false" aria-label="Mint"></button>
-                <button class="swatch swatch-yellow" type="button" data-control="zone-colour" data-value="yellow" aria-pressed="false" aria-label="Yellow"></button>
-              </div>
+          </fieldset>
+          <fieldset class="config-group">
+            <legend>Inside the balloon</legend>
+            <div class="option-grid option-grid--two decoration-toggle" role="group" aria-label="Inside the balloon">
+              <button class="option flower-toggle" type="button" data-control="decoration" data-value="flowers" aria-pressed="false">${controlIcon('flowers')}<span>Add flowers</span><span class="toggle-track" aria-hidden="true"></span></button>
             </div>
+            <p class="composition-label" data-flower-note hidden>Flowers show through your chosen colour. Turn off to restore your previous finish.</p>
           </fieldset>
         </section>
-        <section class="tray-panel" role="tabpanel" id="tray-panel-surface" aria-labelledby="tray-tab-surface" data-tray-panel="surface" hidden>
+        <div class="bottom-controls">
+        <div class="bottom-tabs" role="tablist" aria-label="Surface and form">
+          <button type="button" id="surface-tab" role="tab" aria-selected="true" aria-controls="tray-panel-surface" data-bottom-tab="surface">Surface</button>
+          <button type="button" id="form-tab" role="tab" aria-selected="false" aria-controls="tray-panel-form" tabindex="-1" data-bottom-tab="form">Form</button>
+        </div>
+        <section class="tray-panel" id="tray-panel-surface" role="tabpanel" aria-labelledby="surface-tab" data-bottom-panel="surface">
           <fieldset class="config-group">
             <legend>Surface</legend>
+            <p class="composition-label" id="flower-surface-note" data-flower-surface-note hidden>Tinted glass is active for flowers. Vinyl and chrome are unavailable because they hide the flowers. Turn off Add flowers to restore your previous finish.</p>
             <div class="option-grid option-grid--three">
-              <button class="option is-active" type="button" data-control="finish" data-value="jewel" aria-pressed="true">Jewel glass</button>
-              <button class="option" type="button" data-control="finish" data-value="vinyl" aria-pressed="false">Glossy vinyl</button>
-              <button class="option" type="button" data-control="finish" data-value="chrome" aria-pressed="false">Chrome</button>
+              <button class="option is-active" type="button" data-control="finish" data-value="jewel" aria-pressed="true"><span class="material-sphere material-sphere--jewel" aria-hidden="true"></span><span>Jewel glass</span></button>
+              <button class="option" type="button" data-control="finish" data-value="vinyl" aria-pressed="false"><span class="material-sphere material-sphere--vinyl" aria-hidden="true"></span><span>Glossy vinyl</span></button>
+              <button class="option" type="button" data-control="finish" data-value="chrome" aria-pressed="false"><span class="material-sphere material-sphere--chrome" aria-hidden="true"></span><span>Chrome</span></button>
             </div>
           </fieldset>
         </section>
-        <section class="tray-panel" role="tabpanel" id="tray-panel-form" aria-labelledby="tray-tab-form" data-tray-panel="form" hidden>
+        <section id="tray-panel-form" role="tabpanel" aria-labelledby="form-tab" data-bottom-panel="form" hidden>
+          <div class="form-options">
           <fieldset class="config-group" data-animal-controls="dog">
             <legend>Ears</legend>
             <div class="option-grid">
-              <button class="option is-active" type="button" data-control="ears" data-value="classic" aria-pressed="true">Classic loop</button>
-              <button class="option" type="button" data-control="ears" data-value="tall" aria-pressed="false">Tall loop</button>
-              <button class="option" type="button" data-control="ears" data-value="small" aria-pressed="false">Small loop</button>
+              <button class="option is-active" type="button" data-control="ears" data-value="classic" aria-pressed="true">${formIcon('ears', 'classic')}<span>Classic loop</span></button>
+              <button class="option" type="button" data-control="ears" data-value="tall" aria-pressed="false">${formIcon('ears', 'tall')}<span>Tall loop</span></button>
+              <button class="option" type="button" data-control="ears" data-value="small" aria-pressed="false">${formIcon('ears', 'small')}<span>Small loop</span></button>
             </div>
           </fieldset>
           <fieldset class="config-group" data-animal-controls="dog">
             <legend>Body</legend>
             <div class="option-grid">
-              <button class="option is-active" type="button" data-control="body" data-value="classic" aria-pressed="true">Classic</button>
-              <button class="option" type="button" data-control="body" data-value="compact" aria-pressed="false">Compact</button>
-              <button class="option" type="button" data-control="body" data-value="long" aria-pressed="false">Long</button>
+              <button class="option is-active" type="button" data-control="body" data-value="classic" aria-pressed="true">${formIcon('body', 'classic')}<span>Classic</span></button>
+              <button class="option" type="button" data-control="body" data-value="compact" aria-pressed="false">${formIcon('body', 'compact')}<span>Compact</span></button>
+              <button class="option" type="button" data-control="body" data-value="long" aria-pressed="false">${formIcon('body', 'long')}<span>Long</span></button>
             </div>
           </fieldset>
           <fieldset class="config-group" data-animal-controls="dog">
             <legend>Tail</legend>
             <div class="option-grid">
-              <button class="option is-active" type="button" data-control="tail" data-value="upright" aria-pressed="true">Upright</button>
-              <button class="option" type="button" data-control="tail" data-value="short" aria-pressed="false">Short curl</button>
-              <button class="option" type="button" data-control="tail" data-value="long" aria-pressed="false">Long flourish</button>
+              <button class="option is-active" type="button" data-control="tail" data-value="upright" aria-pressed="true">${formIcon('tail', 'upright')}<span>Upright</span></button>
+              <button class="option" type="button" data-control="tail" data-value="balloon-tip" aria-pressed="false">${formIcon('tail', 'balloon-tip')}<span>Balloon tip</span></button>
+              <button class="option" type="button" data-control="tail" data-value="curved-tip" aria-pressed="false">${formIcon('tail', 'curved-tip')}<span>Curved tip</span></button>
             </div>
           </fieldset>
+          ${[
+            ['ears', 'Ears', [['classic', 'Classic ears'], ['long', 'Long ears'], ['short', 'Short ears']]],
+            ['tail', 'Tail', [['round', 'Round tail'], ['heart', 'Heart tail'], ['curled', 'Curled tail']]],
+          ].map(([group, label, options]) => `<fieldset class="config-group" data-animal-controls="rabbit" hidden>
+            <legend>${label}</legend><div class="option-grid">
+            ${options.map(([value, text], index) => `<button class="option${index === 0 ? ' is-active' : ''}" type="button" data-control="rabbit-${group}" data-value="${value}" aria-pressed="${index === 0}">${rabbitFormIcon(group, value)}<span>${text}</span></button>`).join('')}
+            </div></fieldset>`).join('')}
+          </div>
         </section>
+        </div>
       </aside>
+      </div>
     </div>
     <section class="viewer" aria-label="Interactive 3D balloon dog viewer">
       <canvas id="dog-canvas" aria-label="A rotatable 3D balloon dog"></canvas>
-      <p class="viewer-label">DRAG TO ROTATE <span>·</span> SCROLL TO ZOOM</p>
       <p class="edition">ANIMAL OBJECT / 01</p>
-      <span class="poster-rule poster-rule--viewer" aria-hidden="true"></span>
     </section>
   </main>
+  <footer class="interaction-hint">DRAG TO ROTATE · SCROLL TO ZOOM</footer>
 `
 
 const canvas = document.querySelector('#dog-canvas')
@@ -209,17 +276,7 @@ document.querySelectorAll('[data-theme]').forEach((button) => {
 
 applyTheme(initialTheme)
 
-// Jewel materials are shared by named anatomy groups. Future controls can
-// update the palette or swap finish values without changing the geometry.
-const jewelPalette = {
-  magenta: '#e21b82',
-  violet: '#713de2',
-  cyan: '#13cfc8',
-  blue: '#218fe6',
-  pearl: '#f7d9ed',
-  amber: '#f2ad34',
-}
-
+// Each animal shares one colour material across all of its balloon segments.
 function createJewelMaterial(color) {
   return new THREE.MeshPhysicalMaterial({
     color,
@@ -238,9 +295,25 @@ function createJewelMaterial(color) {
   })
 }
 
-const balloonMaterials = Object.fromEntries(
-  Object.entries(jewelPalette).map(([name, color]) => [name, createJewelMaterial(color)]),
-)
+function createFlowerShellMaterial(color) {
+  return new THREE.MeshPhysicalMaterial({
+    color, roughness: 0.09, metalness: 0,
+    // Transmission reveals the interior while the diffuse component retains
+    // the balloon colour. Keep opacity at 1 to avoid alpha-sorting artifacts.
+    transmission: 0.72, opacity: 1, thickness: 0.22, ior: 1.33,
+    attenuationColor: new THREE.Color('#ffffff').lerp(new THREE.Color(color), 0.25),
+    attenuationDistance: 3,
+    clearcoat: 1, clearcoatRoughness: 0.06, envMapIntensity: 0.85,
+  })
+}
+const flowerShellMaterials = {
+  dog: createFlowerShellMaterial('#e21b82'),
+  rabbit: createFlowerShellMaterial('#16d7cf'),
+}
+const solidColours = { dog: 'pink', rabbit: 'turquoise' }
+const solidMaterials = {
+  dog: createJewelMaterial('#e21b82'), rabbit: createJewelMaterial('#16d7cf'),
+}
 
 const balloonDogSpec = {
   bodyLength: 1,
@@ -256,12 +329,15 @@ const balloonDogSpec = {
 // mutate the established dog anatomy or its selected controls.
 const balloonRabbitSpec = {
   bodyScale: 1,
+  earLength: 1,
+  tailStyle: 'round',
 }
+
+const rabbitFormState = { ears: 'classic', tail: 'round' }
 
 const configuratorState = {
   animal: 'dog',
-  colourComposition: 'original',
-  colourZone: { dog: 'body', rabbit: 'body' },
+  decoration: 'none',
   finish: 'jewel',
   ears: 'classic',
   body: 'classic',
@@ -271,37 +347,12 @@ const configuratorState = {
 const colourOptions = {
   pink: '#e21b82',
   violet: '#713de2',
-  cyan: '#16d7cf',
   turquoise: '#19bfc7',
-  mint: '#a9f28e',
   yellow: '#f5de72',
 }
 
-const colourZoneLabels = {
-  body: 'Body',
-  head: 'Head',
-  ears: 'Ears',
-  'front-legs': 'Front legs',
-  'rear-legs': 'Rear legs',
-  tail: 'Tail',
-}
-
-const customZoneColours = {
-  dog: { body: 'pink', head: 'violet', ears: 'cyan', 'front-legs': 'turquoise', 'rear-legs': 'mint', tail: 'yellow' },
-  rabbit: { body: 'cyan', head: 'pink', ears: 'violet', 'front-legs': 'mint', 'rear-legs': 'turquoise', tail: 'yellow' },
-}
-
-const customZoneMaterials = Object.fromEntries(
-  Object.entries(customZoneColours).map(([animal, zones]) => [
-    animal,
-    Object.fromEntries(Object.entries(zones).map(([zone, colour]) => [zone, createJewelMaterial(colourOptions[colour])])),
-  ]),
-)
-
-function zoneMaterial(animal, zone, originalMaterial) {
-  return configuratorState.colourComposition === 'custom'
-    ? customZoneMaterials[animal][zone]
-    : originalMaterial
+function animalMaterial(animal) {
+  return configuratorState.decoration === 'flowers' ? flowerShellMaterials[animal] : solidMaterials[animal]
 }
 
 const bodyProfiles = {
@@ -327,10 +378,25 @@ dog.add(dogGeometry)
 
 function disposeDogGeometry() {
   dogGeometry.traverse((part) => {
-    if (part.isMesh) part.geometry.dispose()
+    if (part.isMesh) {
+      part.geometry.dispose()
+      if (part.isInstancedMesh) {
+        part.dispose()
+        part.material.dispose()
+      }
+    }
   })
   dogGeometry.clear()
   balloonParts.length = 0
+}
+
+function updateFlowerInterior() {
+  if (configuratorState.decoration !== 'flowers') return
+  balloonParts.forEach(part => {
+    part.castShadow = false
+    part.receiveShadow = false
+  })
+  dogGeometry.add(createFlowerInterior(balloonParts, dogGeometry))
 }
 
 function createPartGroup(name) {
@@ -428,13 +494,13 @@ function buildBalloonDog(spec) {
   const twists = createPartGroup('twist joints')
   const earProfile = earProfiles[spec.earStyle] || earProfiles.classic
 
-  addDogBubble(torso, anchors.torso.start, anchors.torso.end, 0.55, zoneMaterial('dog', 'body', balloonMaterials.magenta), 'magenta torso')
-  addDogBubble(torso, anchors.neck.root, anchors.neck.top, 0.4, zoneMaterial('dog', 'body', balloonMaterials.amber), 'amber neck')
-  addDogBubble(head, anchors.head.muzzleStart, anchors.head.muzzleEnd, 0.41 * spec.headScale, zoneMaterial('dog', 'head', balloonMaterials.pearl), 'pearl muzzle', 1.06)
-  addBulb(head, anchors.head.muzzleEnd.clone().add(new THREE.Vector3(-0.1, 0, 0)), [0.12, 0.105, 0.105], zoneMaterial('dog', 'head', balloonMaterials.pearl), 'muzzle tied tip')
+  addDogBubble(torso, anchors.torso.start, anchors.torso.end, 0.55, animalMaterial('dog'), 'magenta torso')
+  addDogBubble(torso, anchors.neck.root, anchors.neck.top, 0.4, animalMaterial('dog'), 'amber neck')
+  addDogBubble(head, anchors.head.muzzleStart, anchors.head.muzzleEnd, 0.41 * spec.headScale, animalMaterial('dog'), 'pearl muzzle', 1.06)
+  addBulb(head, anchors.head.muzzleEnd.clone().add(new THREE.Vector3(-0.1, 0, 0)), [0.12, 0.105, 0.105], animalMaterial('dog'), 'muzzle tied tip')
 
   ;[1, -1].forEach((side) => {
-    const material = zoneMaterial('dog', 'ears', balloonMaterials[side > 0 ? 'magenta' : 'violet'])
+    const material = animalMaterial('dog')
     const ear = addMesh(ears, new THREE.TorusGeometry(earProfile.radius, earProfile.tube, 24, 64), material, `${side > 0 ? 'near' : 'far'} sculptural loop ear`)
     ear.scale.set(...earProfile.scale)
     ear.rotation.set(side * 0.1, side * 0.16, -0.15)
@@ -444,56 +510,92 @@ function buildBalloonDog(spec) {
   })
 
   const legParts = [
-    { anchor: anchors.legs.frontNear, material: zoneMaterial('dog', 'front-legs', balloonMaterials.violet), name: 'front near' },
-    { anchor: anchors.legs.frontFar, material: zoneMaterial('dog', 'front-legs', balloonMaterials.cyan), name: 'front far' },
-    { anchor: anchors.legs.rearNear, material: zoneMaterial('dog', 'rear-legs', balloonMaterials.blue), name: 'rear near' },
-    { anchor: anchors.legs.rearFar, material: zoneMaterial('dog', 'rear-legs', balloonMaterials.magenta), name: 'rear far' },
+    { anchor: anchors.legs.frontNear, material: animalMaterial('dog'), name: 'front near' },
+    { anchor: anchors.legs.frontFar, material: animalMaterial('dog'), name: 'front far' },
+    { anchor: anchors.legs.rearNear, material: animalMaterial('dog'), name: 'rear near' },
+    { anchor: anchors.legs.rearFar, material: animalMaterial('dog'), name: 'rear far' },
   ]
   legParts.forEach(({ anchor, material, name }) => {
     addDogBubble(legs, anchor.root, anchor.end, 0.43, material, `${name} inflated leg`, 0.94)
     addBulb(twists, anchor.root, [0.22, 0.17, 0.2], material, `${name} compressed twist`)
   })
 
-  const tailMaterial = zoneMaterial('dog', 'tail', balloonMaterials.cyan)
+  const tailMaterial = animalMaterial('dog')
   if (spec.tailStyle === 'upright') {
     addDogBubble(tail, anchors.tail.root, anchors.tail.tip, 0.3, tailMaterial, 'inflated upright tail')
     const tipEnd = anchors.tail.tip.clone().add(new THREE.Vector3(0.1, 0.26, 0))
-    addDogBubble(tail, anchors.tail.tip, tipEnd, 0.09, zoneMaterial('dog', 'tail', balloonMaterials.violet), 'slender tail tip')
+    addDogBubble(tail, anchors.tail.tip, tipEnd, 0.09, animalMaterial('dog'), 'slender tail tip')
   } else {
-    const length = spec.tailStyle === 'long' ? 1.25 : 0.62
-    // One closed torus gives a folded curl; bury its lower arc in the rump.
-    const curl = addMesh(tail, new THREE.TorusGeometry(length * 0.45, 0.19, 24, 64), tailMaterial, 'folded tail curl')
-    curl.scale.set(0.8, spec.tailLift, 1)
-    curl.position.copy(anchors.tail.root).add(new THREE.Vector3(0.08, length * 0.32, 0))
-    curl.rotation.z = -0.22
+    const root = anchors.tail.root
+    const tip = anchors.tail.tip.clone()
+    if (spec.tailStyle === 'balloon-tip') {
+      addCapsule(tail, root, tip, 0.065, tailMaterial, 'thin balloon tail stem')
+    } else {
+      // Standard capped extrusion: a gentle bend, with no custom tube mesh.
+      const curve = new THREE.CubicBezierCurve3(
+        root.clone(),
+        root.clone().add(new THREE.Vector3(0.03, 0.55 * spec.tailLift, 0)),
+        tip.clone().add(new THREE.Vector3(0.18, -0.48 * spec.tailLift, 0)),
+        tip.clone(),
+      )
+      const section = new THREE.Shape()
+      section.absarc(0, 0, 0.065, 0, Math.PI * 2, false)
+      addMesh(tail, new THREE.ExtrudeGeometry(section, {
+        extrudePath: curve, steps: 48, curveSegments: 16, bevelEnabled: false,
+      }), tailMaterial, 'gently curved balloon tail stem')
+    }
+    addBulb(tail, tip, [0.18, 0.21, 0.18], tailMaterial, 'inflated balloon tail tip')
   }
-  addBulb(twists, anchors.neck.root, [0.24, 0.18, 0.24], zoneMaterial('dog', 'body', balloonMaterials.amber), 'neck body twist')
-  addBulb(twists, anchors.neck.top, [0.25, 0.18, 0.27], zoneMaterial('dog', 'head', balloonMaterials.pearl), 'head twist')
+  addBulb(twists, anchors.neck.root, [0.24, 0.18, 0.24], animalMaterial('dog'), 'neck body twist')
+  addBulb(twists, anchors.neck.top, [0.25, 0.18, 0.27], animalMaterial('dog'), 'head twist')
   addBulb(twists, anchors.tail.root, [0.22, 0.19, 0.22], tailMaterial, 'tail root twist')
 }
 
 function createRabbitAnchors(spec) {
   const scale = spec.bodyScale
   const point = (x, y, z = 0) => new THREE.Vector3(x * scale, y * scale, z * scale)
-  const bodyCenter = point(0.04, 1.46)
-  const headCenter = point(-1.01, 2.02)
-  const earAttachmentHeight = 0.82 * scale
+  const bodyCenter = point(0.12, 0.94)
+  const headCenter = point(-0.38, 2.2)
 
-  return {
-    body: { center: bodyCenter, scale: [1.12 * scale, 0.68 * scale, 0.72 * scale] },
-    head: { center: headCenter, scale: [0.63 * scale, 0.56 * scale, 0.59 * scale] },
+  const anchors = {
+    body: { center: bodyCenter, scale: [0.84 * scale, 0.92 * scale, 0.62 * scale] },
+    neck: { center: point(-0.25, 1.7), scale: [0.3 * scale, 0.25 * scale, 0.3 * scale] },
+    head: { center: headCenter, scale: [0.62 * scale, 0.59 * scale, 0.57 * scale] },
+    muzzle: { center: headCenter.clone().add(point(-0.45, -0.12)), scale: [0.4 * scale, 0.29 * scale, 0.38 * scale] },
+    nose: { center: headCenter.clone().add(point(-0.82, -0.1)), scale: [0.1 * scale, 0.095 * scale, 0.11 * scale] },
     ears: {
-      right: headCenter.clone().add(new THREE.Vector3(0, earAttachmentHeight, 0.45 * scale)),
-      left: headCenter.clone().add(new THREE.Vector3(0, earAttachmentHeight, -0.45 * scale)),
+      right: { root: headCenter.clone().add(point(0.09, 0.44, 0.3)), tip: headCenter.clone().add(point(0.23, 1.91, 0.62)) },
+      left: { root: headCenter.clone().add(point(0.09, 0.44, -0.3)), tip: headCenter.clone().add(point(0.23, 1.91, -0.62)) },
     },
     legs: {
-      frontNear: { root: point(-0.62, 0.64, 0.36), end: point(-0.72, -0.11, 0.36), radius: 0.25 },
-      frontFar: { root: point(-0.62, 0.64, -0.36), end: point(-0.72, -0.11, -0.36), radius: 0.25 },
-      rearNear: { center: point(0.67, 0.54, 0.38), scale: [0.49 * scale, 0.64 * scale, 0.47 * scale] },
-      rearFar: { center: point(0.67, 0.54, -0.38), scale: [0.49 * scale, 0.64 * scale, 0.47 * scale] },
+      frontNear: { root: point(-0.55, 0.91, 0.32), end: point(-0.8, 0.03, 0.4), radius: 0.25 * scale },
+      frontFar: { root: point(-0.55, 0.91, -0.32), end: point(-0.8, 0.03, -0.4), radius: 0.25 * scale },
+      rearNear: { root: point(0.62, 0.94, 0.37), end: point(0.06, 0.06, 0.66), radius: 0.36 * scale },
+      rearFar: { root: point(0.62, 0.94, -0.37), end: point(0.06, 0.06, -0.66), radius: 0.36 * scale },
     },
-    tail: { center: point(1.22, 1.72, -0.08), scale: [0.39 * scale, 0.39 * scale, 0.39 * scale] },
+    tail: { center: point(0.98, 0.78, 0), scale: [0.3 * scale, 0.3 * scale, 0.3 * scale] },
   }
+
+  // The body stays at its default proportions; ears grow from fixed head roots.
+  for (const ear of Object.values(anchors.ears)) {
+    ear.tip.sub(ear.root).multiplyScalar(spec.earLength).add(ear.root)
+  }
+  const tailRadius = 0.3 * scale
+  const rumpEdge = bodyCenter.x + anchors.body.scale[0]
+  anchors.tail.center.x = rumpEdge + (tailRadius - 0.28 * scale)
+  anchors.tail.scale = [tailRadius, tailRadius, tailRadius]
+  anchors.tail.root = point(0, 0.78)
+  anchors.tail.root.x = rumpEdge - 0.08 * scale
+  return anchors
+}
+
+// Rabbit-only inflated forms retain SphereGeometry's closed surface and normals.
+function addRabbitBubble(group, root, tip, radius, depth, material, name, scale) {
+  const axis = tip.clone().sub(root)
+  const mesh = addBulb(group, root.clone().add(tip).multiplyScalar(0.5),
+    [radius, axis.length() / 2 + 0.09 * scale, radius * depth], material, name)
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis.normalize())
+  return mesh
 }
 
 function buildBalloonRabbit(spec) {
@@ -506,30 +608,71 @@ function buildBalloonRabbit(spec) {
   const legs = createPartGroup('rabbit legs')
   const tail = createPartGroup('rabbit tail')
 
-  addBulb(torso, anchors.body.center, anchors.body.scale, zoneMaterial('rabbit', 'body', balloonMaterials.cyan), 'cyan rabbit body')
-  addBulb(head, anchors.head.center, anchors.head.scale, zoneMaterial('rabbit', 'head', balloonMaterials.pearl), 'pearl rabbit head')
+  addBulb(torso, anchors.body.center, anchors.body.scale, animalMaterial('rabbit'), 'cyan rabbit body')
+  addBulb(torso, anchors.neck.center, anchors.neck.scale, animalMaterial('rabbit'), 'compressed rabbit neck')
+  addBulb(head, anchors.head.center, anchors.head.scale, animalMaterial('rabbit'), 'pearl rabbit head')
+  addBulb(head, anchors.muzzle.center, anchors.muzzle.scale, animalMaterial('rabbit'), 'rounded rabbit muzzle')
+  addBulb(head, anchors.nose.center, anchors.nose.scale, animalMaterial('rabbit'), 'rabbit tied nose')
 
   ;[
-    { position: anchors.ears.right, material: zoneMaterial('rabbit', 'ears', balloonMaterials.magenta), name: 'right tall loop ear', side: 1 },
-    { position: anchors.ears.left, material: zoneMaterial('rabbit', 'ears', balloonMaterials.violet), name: 'left tall loop ear', side: -1 },
-  ].forEach(({ position, material, name, side }) => {
-    const ear = addMesh(ears, new THREE.TorusGeometry(0.51, 0.17, 24, 64), material, name)
-    ear.position.copy(position)
-    ear.scale.set(0.62, 1.48, 1)
-    ear.rotation.set(side * 0.14, side * 0.08, 0)
+    { anchor: anchors.ears.right, material: animalMaterial('rabbit'), name: 'right inflated ear' },
+    { anchor: anchors.ears.left, material: animalMaterial('rabbit'), name: 'left inflated ear' },
+  ].forEach(({ anchor, material, name }) => {
+    addRabbitBubble(ears, anchor.root, anchor.tip, 0.3 * spec.bodyScale, 0.78, material, name, spec.bodyScale)
+    addBulb(ears, anchor.root, [0.18, 0.12, 0.16].map(value => value * spec.bodyScale), material, `${name} pinched base`)
   })
 
   const legParts = [
-    { anchor: anchors.legs.frontNear, material: zoneMaterial('rabbit', 'front-legs', balloonMaterials.violet), name: 'front near' },
-    { anchor: anchors.legs.frontFar, material: zoneMaterial('rabbit', 'front-legs', balloonMaterials.cyan), name: 'front far' },
+    { anchor: anchors.legs.frontNear, material: animalMaterial('rabbit'), name: 'front near' },
+    { anchor: anchors.legs.frontFar, material: animalMaterial('rabbit'), name: 'front far' },
+    { anchor: anchors.legs.rearNear, material: animalMaterial('rabbit'), name: 'rear near' },
+    { anchor: anchors.legs.rearFar, material: animalMaterial('rabbit'), name: 'rear far' },
   ]
   legParts.forEach(({ anchor, material, name }) => {
-    addCapsule(legs, anchor.root, anchor.end, anchor.radius, material, `${name} rabbit leg`)
+    addRabbitBubble(legs, anchor.root, anchor.end, anchor.radius, 0.94, material, `${name} rabbit leg`, spec.bodyScale)
   })
-  addBulb(legs, anchors.legs.rearNear.center, anchors.legs.rearNear.scale, zoneMaterial('rabbit', 'rear-legs', balloonMaterials.blue), 'rear near rounded haunch')
-  addBulb(legs, anchors.legs.rearFar.center, anchors.legs.rearFar.scale, zoneMaterial('rabbit', 'rear-legs', balloonMaterials.magenta), 'rear far rounded haunch')
 
-  addBulb(tail, anchors.tail.center, anchors.tail.scale, zoneMaterial('rabbit', 'tail', balloonMaterials.amber), 'amber rabbit tail')
+  if (spec.tailStyle === 'heart') {
+    const material = animalMaterial('rabbit')
+    addBulb(tail, anchors.tail.root, [0.17, 0.16, 0.17].map(v => v * spec.bodyScale), material, 'rabbit heart tail twist')
+    const scale = spec.bodyScale
+    const center = anchors.tail.root.clone().add(new THREE.Vector3(0.24, 0.26, 0).multiplyScalar(scale))
+    // Face the rear/three-quarter view; circular cross-sections give depth
+    // when orbiting. Each half is a capped standard Three.js extrusion.
+    const point = (x, y) => new THREE.Vector3(0, y, -x)
+    const section = new THREE.Shape()
+    section.absarc(0, 0, 0.065, 0, Math.PI * 2, false)
+    for (const side of [-1, 1]) {
+      const curve = new THREE.CurvePath()
+      curve.add(new THREE.CubicBezierCurve3(
+        point(0, -0.24), point(side * 0.09, -0.16), point(side * 0.29, -0.01), point(side * 0.26, 0.15),
+      ))
+      curve.add(new THREE.CubicBezierCurve3(
+        point(side * 0.26, 0.15), point(side * 0.23, 0.32), point(side * 0.06, 0.32), point(0, 0.13),
+      ))
+      const geometry = new THREE.ExtrudeGeometry(section, {
+        extrudePath: curve, steps: 64, curveSegments: 20, bevelEnabled: false,
+      })
+      const tube = addMesh(tail, geometry, material, `rabbit heart ${side < 0 ? 'left' : 'right'} balloon tube`)
+      tube.scale.setScalar(scale)
+      tube.position.copy(center)
+    }
+    const bottom = center.clone().add(point(0, -0.24).multiplyScalar(scale))
+    const notch = center.clone().add(point(0, 0.13).multiplyScalar(scale))
+    // Rounded overlaps conceal the flat end caps and suggest compressed twists.
+    addBulb(tail, bottom, [0.067, 0.06, 0.067].map(v => v * scale), material, 'rabbit heart lower pinch')
+    addBulb(tail, notch, [0.067, 0.06, 0.067].map(v => v * scale), material, 'rabbit heart upper pinch')
+    addRabbitBubble(tail, anchors.tail.root, bottom, 0.1 * scale, 0.9, material, 'rabbit heart attachment twist', scale)
+  } else if (spec.tailStyle === 'curled') {
+    const material = animalMaterial('rabbit')
+    addBulb(tail, anchors.tail.root, [0.17, 0.16, 0.17].map(v => v * spec.bodyScale), material, 'rabbit tail twist')
+    const curl = addMesh(tail, new THREE.TorusGeometry(0.23, 0.12, 24, 48), material, 'rabbit curled tail')
+    curl.scale.setScalar(spec.bodyScale)
+    curl.position.copy(anchors.tail.root).add(new THREE.Vector3(0.17, 0.18, 0).multiplyScalar(spec.bodyScale))
+    curl.rotation.z = -0.2
+  } else {
+    addBulb(tail, anchors.tail.center, anchors.tail.scale, animalMaterial('rabbit'), 'amber rabbit tail')
+  }
 }
 
 buildBalloonDog(balloonDogSpec)
@@ -552,19 +695,30 @@ function updateMaterialFinish(material, color) {
 }
 
 function updateMaterials() {
-  Object.entries(balloonMaterials).forEach(([name, material]) => {
-    updateMaterialFinish(material, jewelPalette[name])
+  Object.entries(solidMaterials).forEach(([animal, material]) => {
+    const color = colourOptions[solidColours[animal]]
+    updateMaterialFinish(material, color)
+    const shell = flowerShellMaterials[animal]
+    shell.color.set(color)
+    shell.attenuationColor.set('#ffffff').lerp(shell.color, 0.25)
   })
-  Object.entries(customZoneMaterials).forEach(([animal, zones]) => {
-    Object.entries(zones).forEach(([zone, material]) => {
-      updateMaterialFinish(material, colourOptions[customZoneColours[animal][zone]])
-    })
-  })
+  updateSurfacePreviews()
+}
+
+function updateSurfacePreviews() {
+  document.querySelector('#tray-panel-surface').style.setProperty(
+    '--material-colour', colourOptions[solidColours[configuratorState.animal]],
+  )
 }
 
 function rebuildFromConfigurator() {
   if (configuratorState.animal === 'rabbit') {
+    Object.assign(balloonRabbitSpec, {
+      earLength: { classic: 1, long: 1.18, short: 0.72 }[rabbitFormState.ears],
+      tailStyle: rabbitFormState.tail,
+    })
     buildBalloonRabbit(balloonRabbitSpec)
+    updateFlowerInterior()
     return
   }
 
@@ -573,33 +727,53 @@ function rebuildFromConfigurator() {
     tailStyle: configuratorState.tail,
   })
   buildBalloonDog(balloonDogSpec)
+  updateFlowerInterior()
 }
 
 function updateAnimalControlVisibility() {
-  const isDog = configuratorState.animal === 'dog'
+  document.querySelector('.form-options').classList.toggle('form-options--rabbit', configuratorState.animal === 'rabbit')
   document.querySelectorAll('[data-animal-controls]').forEach((group) => {
     group.hidden = group.dataset.animalControls !== configuratorState.animal
   })
-  const formTab = document.querySelector('[data-tray-tab="form"]')
-  formTab.hidden = !isDog
-  if (!isDog && formTab.getAttribute('aria-selected') === 'true') setActiveTraySection('colour')
 }
 
-function updateCompositionEditor() {
-  const isCustom = configuratorState.colourComposition === 'custom'
-  document.querySelector('[data-composition-editor]').hidden = !isCustom
-
-  const activeZone = configuratorState.colourZone[configuratorState.animal]
-  document.querySelector('[data-active-colour-zone]').textContent = colourZoneLabels[activeZone]
-  document.querySelectorAll('[data-control="colour-zone"]').forEach((button) => {
-    const selected = button.dataset.value === activeZone
-    button.classList.toggle('is-active', selected)
-    button.setAttribute('aria-pressed', String(selected))
+function selectBottomPanel(name) {
+  document.querySelectorAll('[data-bottom-tab]').forEach(tab => {
+    const selected = tab.dataset.bottomTab === name
+    tab.setAttribute('aria-selected', String(selected))
+    tab.tabIndex = selected ? 0 : -1
   })
-  document.querySelectorAll('[data-control="zone-colour"]').forEach((button) => {
-    const selected = button.dataset.value === customZoneColours[configuratorState.animal][activeZone]
-    button.classList.toggle('is-active', selected)
-    button.setAttribute('aria-pressed', String(selected))
+  document.querySelectorAll('[data-bottom-panel]').forEach(panel => {
+    panel.hidden = panel.dataset.bottomPanel !== name
+  })
+}
+
+document.querySelectorAll('[data-bottom-tab]').forEach(tab => {
+  tab.addEventListener('click', () => selectBottomPanel(tab.dataset.bottomTab))
+  tab.addEventListener('keydown', event => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+    event.preventDefault()
+    const tabs = [...document.querySelectorAll('[data-bottom-tab]')].filter(item => !item.hidden)
+    const index = tabs.indexOf(tab)
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1
+      : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length
+    selectBottomPanel(tabs[next].dataset.bottomTab)
+    tabs[next].focus()
+  })
+})
+
+function updateDecorationControls() {
+  updateSurfacePreviews()
+  const hasFlowers = configuratorState.decoration === 'flowers'
+  updateControlState('decoration', configuratorState.decoration)
+  document.querySelector('[data-flower-note]').hidden = !hasFlowers
+  document.querySelector('[data-flower-surface-note]').hidden = !hasFlowers
+  updateControlState('solid-colour', solidColours[configuratorState.animal])
+  updateControlState('finish', hasFlowers ? 'jewel' : configuratorState.finish)
+  document.querySelectorAll('[data-control="finish"]').forEach(button => {
+    button.disabled = hasFlowers && button.dataset.value !== 'jewel'
+    if (button.disabled) button.setAttribute('aria-describedby', 'flower-surface-note')
+    else button.removeAttribute('aria-describedby')
   })
 }
 
@@ -617,48 +791,38 @@ function updateControlState(control, value) {
   })
 }
 
-function setActiveTraySection(sectionName) {
-  document.querySelectorAll('[data-tray-tab]').forEach((tab) => {
-    const selected = tab.dataset.trayTab === sectionName
-    tab.classList.toggle('is-active', selected)
-    tab.setAttribute('aria-selected', String(selected))
-    tab.tabIndex = selected ? 0 : -1
-  })
-  document.querySelectorAll('[data-tray-panel]').forEach((panel) => {
-    panel.hidden = panel.dataset.trayPanel !== sectionName
-  })
-}
-
-document.querySelectorAll('[data-tray-tab]').forEach((tab) => {
-  tab.addEventListener('click', () => setActiveTraySection(tab.dataset.trayTab))
-})
-
 document.querySelectorAll('[data-control]').forEach((button) => {
   button.addEventListener('click', () => {
-    const { control, value } = button.dataset
-    if (control === 'colour-composition') configuratorState.colourComposition = value
-    else if (control !== 'colour-zone' && control !== 'zone-colour') configuratorState[control] = value
+    const { control } = button.dataset
+    const value = control === 'decoration'
+      ? (configuratorState.decoration === 'flowers' ? 'none' : 'flowers')
+      : button.dataset.value
+    if (button.disabled) return
+    if (control.startsWith('rabbit-')) {
+      if (configuratorState.animal !== 'rabbit') return
+      rabbitFormState[control.slice(7)] = value
+      updateControlState(control, value)
+      rebuildFromConfigurator()
+      return
+    }
+    // Tinted glass stays active with flowers; keep the previous finish to restore.
+    if (control === 'finish' && configuratorState.decoration === 'flowers') return
+    if (control !== 'solid-colour') configuratorState[control] = value
     updateControlState(control, value)
 
     if (control === 'finish') updateMaterials()
     if (control === 'animal') {
       updateAnimalControlVisibility()
       updateAnimalTitle()
-      updateCompositionEditor()
+      updateDecorationControls()
       rebuildFromConfigurator()
     }
-    if (control === 'colour-composition') {
-      updateCompositionEditor()
+    if (control === 'decoration') {
+      updateDecorationControls()
       rebuildFromConfigurator()
     }
-    if (control === 'colour-zone') {
-      configuratorState.colourZone[configuratorState.animal] = value
-      updateCompositionEditor()
-    }
-    if (control === 'zone-colour') {
-      const activeZone = configuratorState.colourZone[configuratorState.animal]
-      customZoneColours[configuratorState.animal][activeZone] = value
-      updateCompositionEditor()
+    if (control === 'solid-colour') {
+      solidColours[configuratorState.animal] = value
       updateMaterials()
     }
     if (configuratorState.animal === 'dog' && (control === 'ears' || control === 'body' || control === 'tail')) rebuildFromConfigurator()
@@ -667,7 +831,7 @@ document.querySelectorAll('[data-control]').forEach((button) => {
 
 updateAnimalControlVisibility()
 updateAnimalTitle()
-updateCompositionEditor()
+updateDecorationControls()
 updateMaterials()
 
 function resize() {
