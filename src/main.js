@@ -2,7 +2,8 @@ import './style.css'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
-import { createFlowerInterior } from './flowers.js'
+import { createFlowerInterior, addFlowerSurfacePattern } from './flowers.js'
+import { createAnimalFraming } from './framing.js'
 
 const themeStorageKey = 'balloon-animal-studio-theme'
 const initialTheme = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'
@@ -82,24 +83,27 @@ function controlIcon(name) {
 
 document.querySelector('#app').innerHTML = `
   <main class="prototype">
-    <div class="theme-toggle" role="group" aria-label="Colour theme">
-      <button class="theme-option ${initialTheme === 'light' ? 'is-active' : ''}" type="button" data-theme="light" aria-pressed="${initialTheme === 'light'}">Light</button>
-      <button class="theme-option ${initialTheme === 'dark' ? 'is-active' : ''}" type="button" data-theme="dark" aria-pressed="${initialTheme === 'dark'}">Dark</button>
-    </div>
     <div class="content-column">
       <header class="masthead">
-        <h1 data-animal-title>Chromatic<br><em>Balloon Dog</em></h1>
+        <h1 data-animal-title>Balloon <em>Dog</em></h1>
       </header>
       <div class="config-dock">
       <aside class="config-panel" aria-label="Balloon animal configurator">
-          <fieldset class="animal-section config-group">
+        <div class="theme-toggle" role="group" aria-label="Colour theme">
+          <button class="theme-option ${initialTheme === 'light' ? 'is-active' : ''}" type="button" data-theme="light" aria-pressed="${initialTheme === 'light'}">Light</button>
+          <button class="theme-option ${initialTheme === 'dark' ? 'is-active' : ''}" type="button" data-theme="dark" aria-pressed="${initialTheme === 'dark'}">Dark</button>
+        </div>
+        <div class="side-controls">
+        <section class="animal-section" aria-label="Animal selection">
+          <fieldset class="config-group">
             <legend>Animal</legend>
           <div class="animal-switch" role="group" aria-label="Balloon animal">
             <button class="option is-active animal-preview" type="button" data-control="animal" data-value="dog" aria-pressed="true" aria-label="Balloon Dog">${animalThumbnail('dog')}<span>Dog</span></button>
             <button class="option animal-preview" type="button" data-control="animal" data-value="rabbit" aria-pressed="false" aria-label="Balloon Rabbit">${animalThumbnail('rabbit')}<span>Rabbit</span></button>
           </div>
           </fieldset>
-        <section class="tray-panel colour-rail" aria-label="Colour and decoration">
+        </section>
+        <section class="colour-rail" aria-label="Colour and decoration">
           <fieldset class="config-group">
             <legend>Balloon colour</legend>
               <div class="swatches" role="group" aria-label="Whole animal colour">
@@ -111,9 +115,10 @@ document.querySelector('#app').innerHTML = `
             <div class="option-grid option-grid--two decoration-toggle" role="group" aria-label="Inside the balloon">
               <button class="option flower-toggle" type="button" data-control="decoration" data-value="flowers" aria-pressed="false">${controlIcon('flowers')}<span>Add flowers</span><span class="toggle-track" aria-hidden="true"></span></button>
             </div>
-            <p class="composition-label" data-flower-note hidden>Flowers show through your chosen colour. Turn off to restore your previous finish.</p>
+            <p class="composition-label" data-flower-note hidden></p>
           </fieldset>
         </section>
+        </div>
         <div class="bottom-controls">
         <div class="bottom-tabs" role="tablist" aria-label="Surface and form">
           <button type="button" id="surface-tab" role="tab" aria-selected="true" aria-controls="tray-panel-surface" data-bottom-tab="surface">Surface</button>
@@ -122,7 +127,6 @@ document.querySelector('#app').innerHTML = `
         <section class="tray-panel" id="tray-panel-surface" role="tabpanel" aria-labelledby="surface-tab" data-bottom-panel="surface">
           <fieldset class="config-group">
             <legend>Surface</legend>
-            <p class="composition-label" id="flower-surface-note" data-flower-surface-note hidden>Tinted glass is active for flowers. Vinyl and chrome are unavailable because they hide the flowers. Turn off Add flowers to restore your previous finish.</p>
             <div class="option-grid option-grid--three">
               <button class="option is-active" type="button" data-control="finish" data-value="jewel" aria-pressed="true"><span class="material-sphere material-sphere--jewel" aria-hidden="true"></span><span>Jewel glass</span></button>
               <button class="option" type="button" data-control="finish" data-value="vinyl" aria-pressed="false"><span class="material-sphere material-sphere--vinyl" aria-hidden="true"></span><span>Glossy vinyl</span></button>
@@ -314,6 +318,9 @@ const solidColours = { dog: 'pink', rabbit: 'turquoise' }
 const solidMaterials = {
   dog: createJewelMaterial('#e21b82'), rabbit: createJewelMaterial('#16d7cf'),
 }
+const flowerSurfacePatterns = Object.fromEntries(
+  Object.entries(solidMaterials).map(([animal, material]) => [animal, addFlowerSurfacePattern(material)]),
+)
 
 const balloonDogSpec = {
   bodyLength: 1,
@@ -352,7 +359,8 @@ const colourOptions = {
 }
 
 function animalMaterial(animal) {
-  return configuratorState.decoration === 'flowers' ? flowerShellMaterials[animal] : solidMaterials[animal]
+  return configuratorState.decoration === 'flowers' && configuratorState.finish === 'jewel'
+    ? flowerShellMaterials[animal] : solidMaterials[animal]
 }
 
 const bodyProfiles = {
@@ -375,6 +383,7 @@ scene.add(dog)
 const balloonParts = []
 const dogGeometry = new THREE.Group()
 dog.add(dogGeometry)
+const animalFraming = createAnimalFraming(camera, controls, dogGeometry)
 
 function disposeDogGeometry() {
   dogGeometry.traverse((part) => {
@@ -391,7 +400,7 @@ function disposeDogGeometry() {
 }
 
 function updateFlowerInterior() {
-  if (configuratorState.decoration !== 'flowers') return
+  if (configuratorState.decoration !== 'flowers' || configuratorState.finish !== 'jewel') return
   balloonParts.forEach(part => {
     part.castShadow = false
     part.receiveShadow = false
@@ -698,6 +707,7 @@ function updateMaterials() {
   Object.entries(solidMaterials).forEach(([animal, material]) => {
     const color = colourOptions[solidColours[animal]]
     updateMaterialFinish(material, color)
+    flowerSurfacePatterns[animal](configuratorState.decoration === 'flowers', configuratorState.finish)
     const shell = flowerShellMaterials[animal]
     shell.color.set(color)
     shell.attenuationColor.set('#ffffff').lerp(shell.color, 0.25)
@@ -719,6 +729,7 @@ function rebuildFromConfigurator() {
     })
     buildBalloonRabbit(balloonRabbitSpec)
     updateFlowerInterior()
+    animalFraming.fit()
     return
   }
 
@@ -728,6 +739,7 @@ function rebuildFromConfigurator() {
   })
   buildBalloonDog(balloonDogSpec)
   updateFlowerInterior()
+  animalFraming.fit()
 }
 
 function updateAnimalControlVisibility() {
@@ -767,20 +779,28 @@ function updateDecorationControls() {
   const hasFlowers = configuratorState.decoration === 'flowers'
   updateControlState('decoration', configuratorState.decoration)
   document.querySelector('[data-flower-note]').hidden = !hasFlowers
-  document.querySelector('[data-flower-surface-note]').hidden = !hasFlowers
+  document.querySelector('[data-flower-note]').textContent = {
+    jewel: 'Flowers show inside the transparent balloon.',
+    vinyl: 'Flowers decorate the glossy balloon surface.',
+    chrome: 'Flowers form a subtle pattern on the reflective surface.',
+  }[configuratorState.finish]
   updateControlState('solid-colour', solidColours[configuratorState.animal])
-  updateControlState('finish', hasFlowers ? 'jewel' : configuratorState.finish)
-  document.querySelectorAll('[data-control="finish"]').forEach(button => {
-    button.disabled = hasFlowers && button.dataset.value !== 'jewel'
-    if (button.disabled) button.setAttribute('aria-describedby', 'flower-surface-note')
-    else button.removeAttribute('aria-describedby')
-  })
+  updateControlState('finish', configuratorState.finish)
+}
+
+function alignThemeToggle() {
+  const title = document.querySelector('[data-animal-title]')
+  const range = document.createRange()
+  range.selectNodeContents(title)
+  const overflow = range.getBoundingClientRect().bottom - title.getBoundingClientRect().bottom
+  document.querySelector('.theme-toggle').style.setProperty('--title-text-overflow', `${overflow}px`)
 }
 
 function updateAnimalTitle() {
   const animalName = configuratorState.animal === 'rabbit' ? 'Rabbit' : 'Dog'
-  document.querySelector('[data-animal-title]').innerHTML = `Chromatic<br><em>Balloon ${animalName}</em>`
-  document.title = `Chromatic Balloon ${animalName}`
+  document.querySelector('[data-animal-title]').innerHTML = `Balloon <em>${animalName}</em>`
+  document.title = `Balloon ${animalName}`
+  alignThemeToggle()
 }
 
 function updateControlState(control, value) {
@@ -805,12 +825,14 @@ document.querySelectorAll('[data-control]').forEach((button) => {
       rebuildFromConfigurator()
       return
     }
-    // Tinted glass stays active with flowers; keep the previous finish to restore.
-    if (control === 'finish' && configuratorState.decoration === 'flowers') return
     if (control !== 'solid-colour') configuratorState[control] = value
     updateControlState(control, value)
 
-    if (control === 'finish') updateMaterials()
+    if (control === 'finish') {
+      updateMaterials()
+      updateDecorationControls()
+      rebuildFromConfigurator()
+    }
     if (control === 'animal') {
       updateAnimalControlVisibility()
       updateAnimalTitle()
@@ -818,6 +840,7 @@ document.querySelectorAll('[data-control]').forEach((button) => {
       rebuildFromConfigurator()
     }
     if (control === 'decoration') {
+      updateMaterials()
       updateDecorationControls()
       rebuildFromConfigurator()
     }
@@ -833,6 +856,8 @@ updateAnimalControlVisibility()
 updateAnimalTitle()
 updateDecorationControls()
 updateMaterials()
+window.addEventListener('resize', alignThemeToggle)
+document.fonts.ready.then(alignThemeToggle)
 
 function resize() {
   const { width, height } = canvas.getBoundingClientRect()
@@ -842,12 +867,17 @@ function resize() {
   renderer.setSize(width, height, false)
   camera.aspect = width / height
   camera.updateProjectionMatrix()
+  animalFraming.fit()
 }
 
 new ResizeObserver(resize).observe(canvas)
 resize()
 
-renderer.setAnimationLoop(() => {
+let lastFrameTime
+renderer.setAnimationLoop(time => {
+  const delta = lastFrameTime === undefined ? 1 / 60 : (time - lastFrameTime) / 1000
+  lastFrameTime = time
+  animalFraming.update(delta)
   controls.update()
   renderer.render(scene, camera)
 })

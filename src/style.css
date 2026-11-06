@@ -39,6 +39,8 @@ canvas {
 }
 
 .prototype {
+  --rail-inset: clamp(22px, 4vw, 72px);
+  --viewer-height: min(76svh, calc(100svh - 172px));
   align-items: stretch;
   display: grid;
   gap: 0;
@@ -136,13 +138,13 @@ h1 em {
   align-self: center;
   grid-column: 1;
   grid-row: 1;
-  height: min(76svh, calc(100svh - 172px));
+  height: var(--viewer-height);
   justify-self: center;
   max-height: 820px;
   min-height: 570px;
   min-width: 0;
   position: relative;
-  transform: translateY(50px);
+  transform: none;
   width: min(82vw, 1040px);
   z-index: 3;
 }
@@ -1308,25 +1310,108 @@ body .config-panel #tray-panel-form .option {
   margin: 0;
 }
 
+/* Both rails start in one row. Only this common container owns their spacing. */
+.config-panel .side-controls {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-row: 2;
+  grid-template-columns: subgrid;
+  align-items: start;
+  min-width: 0;
+  pointer-events: none;
+}
+
+.config-panel .side-controls > section {
+  grid-row: 1;
+  align-self: start;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  pointer-events: auto;
+}
+
+.config-panel .side-controls > section > fieldset:first-child {
+  border: 0;
+  margin: 0;
+  min-inline-size: 0;
+  padding: 0;
+}
+
+/* Use the same label-to-controls gap on both rails, including mobile. */
+.config-panel .side-controls > section > fieldset:first-child > [role='group'] {
+  margin-top: 9px;
+  padding-block: 0;
+}
+
 @media (min-width: 1100px) {
   .prototype {
-    /* Keep the original scene row height as controls expand below it. */
-    grid-template-rows: max(570px, calc(100svh - clamp(38px, 5vh, 68px) - 136px)) auto;
+    /* Reserve space for the complete tray and footer; the scene uses the remainder. */
+    height: max(710px, calc(100svh - 30px));
+    min-height: 0;
+    padding: 40px var(--rail-inset) 0;
+    grid-template-columns: 176px minmax(0, 1fr) 176px;
+    grid-template-rows: auto minmax(290px, 1fr) auto;
+    column-gap: 24px;
   }
 
-  .config-panel .animal-section,
-  .config-panel .colour-rail {
-    position: absolute;
-    top: clamp(230px, 30svh, 300px);
-    max-height: max(300px, calc(100svh - 350px));
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    scrollbar-width: thin;
+  .masthead {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    align-self: end;
+    position: static;
+    transform: none;
+    padding: calc(clamp(58px, 8.4vh, 100px) - 4px) 0 0;
+  }
+
+  .masthead h1 {
+    margin: 0;
+  }
+
+  .viewer {
+    grid-column: 1 / -1;
+    grid-row: 1 / 3;
+    align-self: stretch;
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+  }
+
+  .config-panel .bottom-controls {
+    grid-row: 3;
+    min-height: 160px;
+    align-self: start;
+    padding-bottom: 8px;
+  }
+
+  .interaction-hint {
+    height: 30px;
+    padding: 6px 18px 9px;
+  }
+
+  .theme-toggle {
+    position: static;
+    grid-column: 1;
+    grid-row: 1;
+    align-self: end;
+    justify-self: start;
+    transform: translateY(calc(var(--title-text-overflow, 0px) - 30px));
+  }
+
+  .config-panel .side-controls {
+    padding-top: 24px;
+    position: relative;
+    top: 38px;
+  }
+
+  .config-panel .side-controls > section {
+    position: relative;
+    width: 176px;
+    max-height: none;
+    overflow: visible;
   }
 
   .config-panel .animal-section {
-    left: clamp(22px, 4vw, 72px);
-    width: 120px;
+    grid-column: 1;
   }
 
   .config-panel .animal-switch {
@@ -1334,19 +1419,14 @@ body .config-panel #tray-panel-form .option {
   }
 
   .config-panel .colour-rail {
-    max-height: none;
-    overflow: visible;
-    padding: 0;
-    right: clamp(22px, 4vw, 72px);
-    width: 176px;
+    grid-column: 3;
   }
 
   .config-panel .colour-rail .swatches {
-    align-items: flex-start;
+    align-items: flex-end;
     flex-direction: column;
     flex-wrap: nowrap;
     gap: 4px;
-    margin-top: 6px;
     padding: 0;
   }
 
@@ -1396,10 +1476,30 @@ body .config-panel #tray-panel-form .option {
     border-radius: 0;
     box-shadow: none;
     display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 24px;
     margin: 0 auto;
     max-width: 640px;
     padding: 0;
+  }
+
+  .config-panel .theme-toggle {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: start;
+    position: static;
+  }
+
+  .config-panel .animal-section {
+    grid-column: 1;
+  }
+
+  .config-panel .animal-switch {
+    grid-template-columns: 1fr;
+  }
+
+  .config-panel .colour-rail {
+    grid-column: 2;
   }
 
   .config-panel .tray-panel {
@@ -1414,6 +1514,19 @@ body .config-panel #tray-panel-form .option {
   .config-panel .swatches {
     gap: 9px;
   }
+}
+
+.config-panel .colour-rail {
+  text-align: right;
+}
+
+.config-panel .colour-rail legend {
+  margin-left: auto;
+}
+
+.config-panel .colour-rail .swatches {
+  align-items: flex-end;
+  padding-inline: 0;
 }
 
 @media (max-width: 767px) {

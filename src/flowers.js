@@ -1,5 +1,69 @@
 import * as THREE from 'three'
 
+// Paint directly into the physical material: no extra shell, depth fighting or
+// UV seam. Three local planar projections blend across each curved segment.
+export function addFlowerSurfacePattern(material) {
+  const enabled = { value: 0 }
+  const chrome = { value: 0 }
+  material.onBeforeCompile = shader => {
+    shader.uniforms.flowerPatternEnabled = enabled
+    shader.uniforms.flowerPatternChrome = chrome
+    const varyings = `
+      varying vec3 vFlowerPosition;
+      varying vec3 vFlowerNormal;
+    `
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', `#include <common>\n${varyings}`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        // Retain each part's scale, but exclude translation and rotation so
+        // the print stays attached when the animal or camera moves.
+        vec3 flowerScale = vec3(length(modelMatrix[0].xyz), length(modelMatrix[1].xyz), length(modelMatrix[2].xyz));
+        vFlowerPosition = position * flowerScale;
+        vFlowerNormal = normalize(normal / max(flowerScale, vec3(0.0001)));
+      `)
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>
+        ${varyings}
+        uniform float flowerPatternEnabled;
+        uniform float flowerPatternChrome;
+        float flowerPrint(vec2 position) {
+          vec2 tile = position / 0.72;
+          vec2 cell = floor(tile);
+          vec2 p = fract(tile) - 0.5;
+          float turn = sin(dot(cell, vec2(12.9898, 78.233))) * 3.14159;
+          float angle = atan(p.y, p.x) + turn;
+          float edge = length(p) - (0.22 + 0.075 * cos(6.0 * angle));
+          float aa = max(fwidth(edge), 0.002);
+          return 1.0 - smoothstep(-aa, aa, edge);
+        }
+      `)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        float flowerMask = 0.0;
+        if (flowerPatternEnabled > 0.5) {
+          vec3 weights = pow(abs(normalize(vFlowerNormal)), vec3(8.0));
+          weights /= max(dot(weights, vec3(1.0)), 0.0001);
+          flowerMask = dot(weights, vec3(
+            flowerPrint(vFlowerPosition.yz),
+            flowerPrint(vFlowerPosition.zx),
+            flowerPrint(vFlowerPosition.xy)
+          ));
+          // A tonal print keeps the chosen balloon colour and physical lighting.
+          float ink = mix(0.48, 0.10, flowerPatternChrome);
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0), flowerMask * ink);
+        }
+      `)
+      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+        // A restrained etched finish on chrome; its metalness is untouched.
+        roughnessFactor = clamp(roughnessFactor + flowerMask * mix(0.025, 0.14, flowerPatternChrome), 0.0, 1.0);
+      `)
+  }
+  material.customProgramCacheKey = () => 'balloon-flower-print-v1'
+  return (active, finish) => {
+    enabled.value = active && finish !== 'jewel' ? 1 : 0
+    chrome.value = finish === 'chrome' ? 1 : 0
+  }
+}
+
 // Low-poly rounded petals share one instanced draw call, including the centres.
 // Positions are deterministic so changing a finish never rearranges the bouquet.
 export function createFlowerInterior(parts, model) {
