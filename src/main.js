@@ -1,4 +1,5 @@
 import './style.css'
+import { setupMobileNavigation } from './mobile-navigation.js'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
@@ -401,10 +402,9 @@ function disposeDogGeometry() {
 
 function updateFlowerInterior() {
   if (configuratorState.decoration !== 'flowers' || configuratorState.finish !== 'jewel') return
-  balloonParts.forEach(part => {
-    part.castShadow = false
-    part.receiveShadow = false
-  })
+  // Keep the shell's contact and self shadows. Only the interior flowers skip
+  // shadow receiving, so the enclosing shell cannot black out the bouquet.
+  // Physical transmission (not alpha blending) reveals them through the shell.
   dogGeometry.add(createFlowerInterior(balloonParts, dogGeometry))
 }
 
@@ -858,6 +858,7 @@ updateDecorationControls()
 updateMaterials()
 window.addEventListener('resize', alignThemeToggle)
 document.fonts.ready.then(alignThemeToggle)
+setupMobileNavigation()
 
 function resize() {
   const { width, height } = canvas.getBoundingClientRect()

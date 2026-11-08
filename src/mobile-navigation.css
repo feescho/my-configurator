@@ -1,0 +1,126 @@
+/* The only rule outside the mobile breakpoint hides the new UI on desktop. */
+.mobile-configurator { display: none; }
+
+@media (max-width: 767px) {
+  .config-panel .side-controls,
+  .config-panel .bottom-controls,
+  .interaction-hint { display: none; }
+
+  html, body { height: 100%; overflow: hidden; }
+  .prototype {
+    --mobile-hero-height: calc(100dvh - 220px);
+    --mobile-title-size: clamp(40px, 13vw, 64px);
+    height: 100dvh;
+    min-height: 0;
+    padding-top: clamp(80px, 14dvh, 112px);
+    padding-bottom: 80px;
+    overflow: hidden;
+  }
+  /* One viewport-width grid cell anchors both layers of the mobile hero. */
+  .masthead {
+    position: static;
+    grid-column: 1;
+    grid-row: 1;
+    align-self: start;
+    justify-self: center;
+    width: 100%;
+    /* Anchor the headline's baseline in the upper quarter of the scene. */
+    padding: max(0px, calc(var(--mobile-hero-height) / 4 - var(--mobile-title-size) * 0.8)) 0 0;
+    transform: none;
+    text-align: center;
+  }
+  .masthead h1 {
+    font-size: var(--mobile-title-size);
+    line-height: 1;
+    margin: 0;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .config-dock { margin: 0; }
+  .config-panel .theme-toggle { position: fixed; top: max(12px, env(safe-area-inset-top)); right: max(18px, env(safe-area-inset-right)); }
+  .viewer { margin-top: 0; height: var(--mobile-hero-height); }
+  /* Keep the canvas above the largest open sheet, with room for navigation. */
+  body:has(.mobile-sheet:not([hidden])) .prototype { --mobile-hero-height: max(120px, calc(65dvh - 220px - env(safe-area-inset-bottom))); }
+
+  .mobile-configurator {
+    --mobile-surface: #f4f2f0;
+    --mobile-ink: #242129;
+    --mobile-line: #bcb7c0;
+    display: grid;
+    gap: 6px;
+    position: fixed;
+    inset: auto 0 0;
+    padding: 6px max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+    z-index: 20;
+    color: var(--mobile-ink);
+    pointer-events: none;
+  }
+  body.theme-dark .mobile-configurator {
+    --mobile-surface: #232329;
+    --mobile-ink: #f4f0eb;
+    --mobile-line: #5d5b66;
+  }
+  .mobile-configurator button { cursor: pointer; color: inherit; }
+  .mobile-configurator button:focus-visible { outline: 2px solid #e21b82; outline-offset: 2px; }
+  .mobile-sheet, .mobile-nav { pointer-events: auto; }
+  .mobile-sheet {
+    background: var(--mobile-surface);
+    border: 1px solid color-mix(in srgb, var(--mobile-line) 35%, transparent);
+    border-radius: 14px;
+    padding: 8px 10px 10px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    max-height: 35dvh;
+    overflow: hidden;
+    overscroll-behavior: contain;
+    box-shadow: 0 8px 30px #0002;
+  }
+  .mobile-sheet[hidden], .mobile-sheet [hidden] { display: none; }
+  .mobile-sheet-content { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 3px; }
+  .mobile-sheet-header { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+  .mobile-sheet-header h2 { font-size: 13px; font-weight: 500; margin: 0; }
+  .mobile-sheet-close { background: none; border: 0; font-size: 23px; min-width: 36px; min-height: 32px; margin: 0 -4px 0 0; }
+  .mobile-nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .mobile-nav button {
+    background: var(--mobile-surface); border: 0; border-radius: 12px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 3px; min-height: 56px; padding: 6px 3px; font-size: 11px;
+  }
+  .mobile-nav button[aria-expanded='true'] { background: #e90b8b; color: #fff; }
+  .mobile-nav svg { height: 20px; width: 20px; }
+  .mobile-sheet .animal-switch { display: grid; grid-template-columns: 1fr 1fr; background: none; border: 0; border-radius: 0; gap: 8px; padding: 0; }
+  .mobile-sheet .config-group { margin: 0; padding: 0; min-width: 0; }
+  .mobile-sheet .config-group + .config-group { margin-top: 10px; }
+  .mobile-sheet .config-group legend { color: var(--mobile-ink); font-size: 11px; }
+  .mobile-sheet .animal-section legend,
+  .mobile-sheet .tray-panel legend { display: none; }
+  .mobile-sheet .tray-panel { padding: 0; }
+  .mobile-sheet .option {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 4px; border: 1px solid var(--mobile-line); border-radius: 7px;
+    color: var(--mobile-ink); background: transparent; min-height: 48px; padding: 5px 3px; font-size: 10px; line-height: 1.2;
+  }
+  body .mobile-sheet .option:hover,
+  body .mobile-sheet .animal-switch .option:hover,
+  body .mobile-sheet .animal-switch .option.is-active,
+  body .mobile-sheet .option.is-active { border-color: #ec098b; background: transparent; color: var(--mobile-ink); }
+  .mobile-sheet .animal-thumbnail { width: 28px; height: 26px; }
+  .mobile-sheet .control-icon { width: 20px; height: 20px; }
+  .mobile-sheet .form-icon { width: 28px; height: 24px; }
+  .mobile-sheet .form-options { display: grid; grid-template-columns: 1fr; gap: 6px; padding: 0; }
+  .mobile-sheet .form-options .config-group { margin: 0; }
+  .mobile-sheet .form-options legend { float: left; width: 38px; padding-top: 18px; font-size: 10px; }
+  .mobile-sheet .form-options .option-grid { margin: 0 0 0 42px; gap: 5px; }
+  .mobile-sheet .form-options .option { min-width: 0; gap: 2px; }
+  .mobile-sheet .animal-preview { flex-direction: row; gap: 6px; }
+  .mobile-sheet .material-sphere { width: 24px; height: 24px; flex-basis: 24px; outline-offset: 2px; }
+  .mobile-sheet .option-grid { margin-top: 5px; }
+  .mobile-sheet .colour-rail { text-align: left; }
+  .mobile-sheet .colour-rail legend { margin-left: 0; }
+  .mobile-sheet .swatches { gap: 8px; flex-wrap: wrap; padding: 4px; margin-top: 4px; }
+  .mobile-sheet .swatch { width: 44px; height: 44px; }
+  .mobile-sheet .decoration-toggle { grid-template-columns: 1fr; }
+  .mobile-sheet .flower-toggle { flex-direction: row; min-height: 40px; padding: 6px 8px; }
+  .mobile-sheet .composition-label { color: var(--mobile-ink); font-size: 10px; margin-top: 6px; }
+}
